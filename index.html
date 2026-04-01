@@ -49,8 +49,11 @@
     const MAX_BALLS = 50;
     const BASE_SIZE = 50;
     const STEP = 3;
-    const SHRINK_UNTIL = 10; // balls 1-10 shrink, 11-50 grow
+    const SHRINK_UNTIL = 10;
+    const SQUARE_SIZE = 60;
+    const NUM_SQUARES = 17;
     const balls = [];
+    const squares = [];
 
     function randomHex() {
       return '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
@@ -65,29 +68,55 @@
       }
     }
 
+    function createSquares() {
+      for (let i = 0; i < NUM_SQUARES; i++) {
+        squares.push({
+          x: SQUARE_SIZE + Math.random() * (window.innerWidth  - SQUARE_SIZE * 3),
+          y: SQUARE_SIZE + Math.random() * (window.innerHeight - SQUARE_SIZE * 3),
+          size: SQUARE_SIZE,
+        });
+      }
+    }
+
+    // AABB collision: returns which axis to reflect, or null
+    function getCollisionAxis(b, s) {
+      const bRight  = b.x + b.size,  bBottom = b.y + b.size;
+      const sRight  = s.x + s.size,  sBottom = s.y + s.size;
+
+      if (bRight < s.x || b.x > sRight || bBottom < s.y || b.y > sBottom) return null;
+
+      const overlapLeft   = bRight  - s.x;
+      const overlapRight  = sRight  - b.x;
+      const overlapTop    = bBottom - s.y;
+      const overlapBottom = sBottom - b.y;
+
+      const minX = Math.min(overlapLeft, overlapRight);
+      const minY = Math.min(overlapTop,  overlapBottom);
+
+      return minX < minY ? 'x' : 'y';
+    }
+
     function addBall() {
       if (balls.length >= MAX_BALLS) return;
 
       const index = balls.length;
-      const size = ballSize(index);
-
-      const el = document.createElement('div');
+      const size  = ballSize(index);
+      const el    = document.createElement('div');
       el.className = 'ball';
-      el.style.width = size + 'px';
+      el.style.width  = size + 'px';
       el.style.height = size + 'px';
       el.style.backgroundColor = randomHex();
       document.body.appendChild(el);
 
       const baseSpeed = 2 + index * 0.8;
-      const ball = {
-        el,
-        size,
-        x: Math.random() * (window.innerWidth - size),
+      balls.push({
+        el, size,
+        x: Math.random() * (window.innerWidth  - size),
         y: Math.random() * (window.innerHeight - size),
         vx: (Math.random() < 0.5 ? 1 : -1) * (baseSpeed + Math.random()),
         vy: (Math.random() < 0.5 ? 1 : -1) * (baseSpeed + Math.random() * 0.5),
-      };
-      balls.push(ball);
+        cooldown: {},  // keyed by square index, frames until re-check
+      });
     }
 
     function randomColors() {
@@ -101,17 +130,30 @@
         b.x += b.vx;
         b.y += b.vy;
 
-        if (b.x + b.size >= window.innerWidth || b.x <= 0) b.vx *= -1;
+        // Wall bouncing
+        if (b.x + b.size >= window.innerWidth  || b.x <= 0) b.vx *= -1;
         if (b.y + b.size >= window.innerHeight || b.y <= 0) b.vy *= -1;
 
+        // Square collisions
+        squares.forEach((s, i) => {
+          if (b.cooldown[i] > 0) { b.cooldown[i]--; return; }
+
+          const axis = getCollisionAxis(b, s);
+          if (axis) {
+            if (axis === 'x') b.vx *= -1; else b.vy *= -1;
+            b.el.style.backgroundColor = randomHex();
+            b.cooldown[i] = 20; // ignore this square for 20 frames
+          }
+        });
+
         b.el.style.left = b.x + 'px';
-        b.el.style.top = b.y + 'px';
+        b.el.style.top  = b.y + 'px';
       });
 
       requestAnimationFrame(animate);
     }
 
-    // Start with one ball
+    createSquares();
     addBall();
     animate();
   </script>
