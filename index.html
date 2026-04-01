@@ -30,10 +30,8 @@
     span:hover {
       opacity: 0.7;
     }
-    #ball {
+    .ball {
       position: fixed;
-      width: 50px;
-      height: 50px;
       border-radius: 50%;
       background-color: #ff69b4;
       box-shadow: 0 4px 12px rgba(255, 105, 180, 0.5);
@@ -41,7 +39,6 @@
   </style>
 </head>
 <body>
-  <div id="ball"></div>
   <h1>
     <span id="hello" onclick="randomColors()">Hello</span>
     &nbsp;
@@ -49,33 +46,73 @@
   </h1>
 
   <script>
-    const ball = document.getElementById('ball');
-    let x = 100, y = 100;
-    let vx = 3, vy = 2.5;
-    const size = 50;
+    const MAX_BALLS = 50;
+    const BASE_SIZE = 50;
+    const STEP = 3;
+    const SHRINK_UNTIL = 10; // balls 1-10 shrink, 11-50 grow
+    const balls = [];
 
     function randomHex() {
       return '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
     }
 
+    function ballSize(index) {
+      if (index < SHRINK_UNTIL) {
+        return BASE_SIZE - index * STEP;
+      } else {
+        const minSize = BASE_SIZE - (SHRINK_UNTIL - 1) * STEP;
+        return minSize + (index - SHRINK_UNTIL + 1) * STEP;
+      }
+    }
+
+    function addBall() {
+      if (balls.length >= MAX_BALLS) return;
+
+      const index = balls.length;
+      const size = ballSize(index);
+
+      const el = document.createElement('div');
+      el.className = 'ball';
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+      el.style.backgroundColor = randomHex();
+      document.body.appendChild(el);
+
+      const baseSpeed = 2 + index * 0.8;
+      const ball = {
+        el,
+        size,
+        x: Math.random() * (window.innerWidth - size),
+        y: Math.random() * (window.innerHeight - size),
+        vx: (Math.random() < 0.5 ? 1 : -1) * (baseSpeed + Math.random()),
+        vy: (Math.random() < 0.5 ? 1 : -1) * (baseSpeed + Math.random() * 0.5),
+      };
+      balls.push(ball);
+    }
+
     function randomColors() {
       document.body.style.backgroundColor = randomHex();
-      ball.style.backgroundColor = randomHex();
+      balls.forEach(b => b.el.style.backgroundColor = randomHex());
+      addBall();
     }
 
     function animate() {
-      x += vx;
-      y += vy;
+      balls.forEach(b => {
+        b.x += b.vx;
+        b.y += b.vy;
 
-      if (x + size >= window.innerWidth || x <= 0) vx *= -1;
-      if (y + size >= window.innerHeight || y <= 0) vy *= -1;
+        if (b.x + b.size >= window.innerWidth || b.x <= 0) b.vx *= -1;
+        if (b.y + b.size >= window.innerHeight || b.y <= 0) b.vy *= -1;
 
-      ball.style.left = x + 'px';
-      ball.style.top = y + 'px';
+        b.el.style.left = b.x + 'px';
+        b.el.style.top = b.y + 'px';
+      });
 
       requestAnimationFrame(animate);
     }
 
+    // Start with one ball
+    addBall();
     animate();
   </script>
 </body>
