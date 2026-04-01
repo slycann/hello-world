@@ -78,11 +78,16 @@
 </head>
 <body>
   <div id="ship"></div>
-  <h1>
-    <span id="hello" onclick="randomColors()">Hello</span>
-    &nbsp;
-    <span id="world" onclick="randomColors()">World</span>
-  </h1>
+  <div style="text-align: center;">
+    <h1>
+      <span id="hello" onclick="randomColors()">Hello</span>
+      &nbsp;
+      <span id="world" onclick="randomColors()">World</span>
+    </h1>
+    <p style="font-size: 1.1rem; color: #888; margin-top: -1rem; user-select: none;">
+      (move the ship, space to shoot, find the blocks)
+    </p>
+  </div>
 
   <script>
     const MAX_BALLS = 50;
