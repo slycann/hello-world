@@ -36,6 +36,18 @@
       background-color: #ff69b4;
       box-shadow: 0 4px 12px rgba(255, 105, 180, 0.5);
     }
+
+    .square {
+      position: fixed;
+      width: 60px;
+      height: 60px;
+      background-color: transparent;
+      transition: background-color 0.1s ease;
+    }
+
+    .square.lit {
+      background-color: black;
+    }
   </style>
 </head>
 <body>
@@ -70,11 +82,16 @@
 
     function createSquares() {
       for (let i = 0; i < NUM_SQUARES; i++) {
-        squares.push({
-          x: SQUARE_SIZE + Math.random() * (window.innerWidth  - SQUARE_SIZE * 3),
-          y: SQUARE_SIZE + Math.random() * (window.innerHeight - SQUARE_SIZE * 3),
-          size: SQUARE_SIZE,
-        });
+        const x = SQUARE_SIZE + Math.random() * (window.innerWidth  - SQUARE_SIZE * 3);
+        const y = SQUARE_SIZE + Math.random() * (window.innerHeight - SQUARE_SIZE * 3);
+
+        const el = document.createElement('div');
+        el.className = 'square';
+        el.style.left = x + 'px';
+        el.style.top  = y + 'px';
+        document.body.appendChild(el);
+
+        squares.push({ x, y, size: SQUARE_SIZE, el, litTimer: null });
       }
     }
 
@@ -142,7 +159,12 @@
           if (axis) {
             if (axis === 'x') b.vx *= -1; else b.vy *= -1;
             b.el.style.backgroundColor = randomHex();
-            b.cooldown[i] = 20; // ignore this square for 20 frames
+            b.cooldown[i] = 20;
+
+            // Light up the square for 1 second
+            s.el.classList.add('lit');
+            if (s.litTimer) clearTimeout(s.litTimer);
+            s.litTimer = setTimeout(() => s.el.classList.remove('lit'), 1000);
           }
         });
 
