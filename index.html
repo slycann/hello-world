@@ -48,9 +48,36 @@
     .square.lit {
       background-color: black;
     }
+
+    .square.destroyed {
+      background-color: red !important;
+      transition: none;
+    }
+
+    #ship {
+      position: fixed;
+      width: 28px;
+      height: 34px;
+      clip-path: polygon(50% 0%, 0% 100%, 50% 72%, 100% 100%);
+      background: #00e5ff;
+      filter: drop-shadow(0 0 8px #00e5ff);
+      transform-origin: 50% 50%;
+      z-index: 20;
+    }
+
+    .bullet {
+      position: fixed;
+      width: 4px;
+      height: 12px;
+      background: #ffee00;
+      border-radius: 2px;
+      box-shadow: 0 0 6px #ffee00;
+      z-index: 20;
+    }
   </style>
 </head>
 <body>
+  <div id="ship"></div>
   <h1>
     <span id="hello" onclick="randomColors()">Hello</span>
     &nbsp;
@@ -143,6 +170,9 @@
     }
 
     function animate() {
+      updateShip();
+      updateBullets();
+
       balls.forEach(b => {
         b.x += b.vx;
         b.y += b.vy;
@@ -153,6 +183,7 @@
 
         // Square collisions
         squares.forEach((s, i) => {
+          if (s.destroyed) return;
           if (b.cooldown[i] > 0) { b.cooldown[i]--; return; }
 
           const axis = getCollisionAxis(b, s);
@@ -173,6 +204,116 @@
       });
 
       requestAnimationFrame(animate);
+    }
+
+    // ── Spaceship ──────────────────────────────────────────
+    const shipEl = document.getElementById('ship');
+    const ship = {
+      x: window.innerWidth  / 2,
+      y: window.innerHeight / 2,
+      angle: 0,       // radians, 0 = pointing up
+      vx: 0, vy: 0,
+      shootCooldown: 0,
+    };
+
+    const keys = {};
+    const bullets = [];
+    const BULLET_SPEED = 10;
+    const THRUST = 0.25;
+    const FRICTION = 0.98;
+    const ROTATE_SPEED = 0.065;
+
+    document.addEventListener('keydown', e => {
+      keys[e.key] = true;
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))
+        e.preventDefault();
+    });
+    document.addEventListener('keyup', e => keys[e.key] = false);
+
+    function fireBullet() {
+      const el = document.createElement('div');
+      el.className = 'bullet';
+      document.body.appendChild(el);
+      bullets.push({
+        el,
+        x: ship.x,
+        y: ship.y,
+        vx:  Math.sin(ship.angle) * BULLET_SPEED,
+        vy: -Math.cos(ship.angle) * BULLET_SPEED,
+      });
+    }
+
+    function updateShip() {
+      if (keys['ArrowLeft'])  ship.angle -= ROTATE_SPEED;
+      if (keys['ArrowRight']) ship.angle += ROTATE_SPEED;
+      if (keys['ArrowUp']) {
+        ship.vx += Math.sin(ship.angle) * THRUST;
+        ship.vy -= Math.cos(ship.angle) * THRUST;
+      }
+      if (keys['ArrowDown']) {
+        ship.vx -= Math.sin(ship.angle) * THRUST * 0.5;
+        ship.vy += Math.cos(ship.angle) * THRUST * 0.5;
+      }
+
+      ship.vx *= FRICTION;
+      ship.vy *= FRICTION;
+      ship.x  += ship.vx;
+      ship.y  += ship.vy;
+
+      // Wrap around screen edges
+      if (ship.x < 0)  ship.x = window.innerWidth;
+      if (ship.x > window.innerWidth)  ship.x = 0;
+      if (ship.y < 0)  ship.y = window.innerHeight;
+      if (ship.y > window.innerHeight) ship.y = 0;
+
+      if (ship.shootCooldown > 0) ship.shootCooldown--;
+      if ((keys[' '] || keys['Spacebar']) && ship.shootCooldown === 0) {
+        fireBullet();
+        ship.shootCooldown = 12;
+      }
+
+      shipEl.style.left      = ship.x + 'px';
+      shipEl.style.top       = ship.y + 'px';
+      shipEl.style.transform = `translate(-50%, -50%) rotate(${ship.angle}rad)`;
+    }
+
+    function updateBullets() {
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+
+        // Remove bullet if off screen
+        if (b.x < 0 || b.x > window.innerWidth || b.y < 0 || b.y > window.innerHeight) {
+          b.el.remove();
+          bullets.splice(i, 1);
+          continue;
+        }
+
+        // Check collision with squares
+        let hit = false;
+        squares.forEach(s => {
+          if (hit || s.destroyed) return;
+          if (b.x >= s.x && b.x <= s.x + s.size && b.y >= s.y && b.y <= s.y + s.size) {
+            // Destroy the square — turn it red permanently
+            s.destroyed = true;
+            if (s.litTimer) clearTimeout(s.litTimer);
+            s.el.classList.remove('lit');
+            s.el.classList.add('destroyed');
+            hit = true;
+          }
+        });
+
+        if (hit) {
+          b.el.remove();
+          bullets.splice(i, 1);
+          continue;
+        }
+
+        b.el.style.left      = (b.x - 2) + 'px';
+        b.el.style.top       = (b.y - 6) + 'px';
+        b.el.style.transform = `rotate(${ship.angle}rad)`;
+      }
     }
 
     createSquares();
