@@ -14,6 +14,7 @@
       background-color: #ffffff;
       transition: background-color 0.4s ease;
       font-family: sans-serif;
+      overflow: hidden;
     }
 
     h1 {
@@ -30,6 +31,7 @@
     span:hover {
       opacity: 0.7;
     }
+
     .ball {
       position: fixed;
       border-radius: 50%;
@@ -39,20 +41,14 @@
 
     .square {
       position: fixed;
-      width: 60px;
-      height: 60px;
+      width: 35px;
+      height: 35px;
       background-color: transparent;
       transition: background-color 0.1s ease;
     }
 
-    .square.lit {
-      background-color: black;
-    }
-
-    .square.destroyed {
-      background-color: red !important;
-      transition: none;
-    }
+    .square.lit       { background-color: black; }
+    .square.destroyed { background-color: red !important; transition: none; }
 
     #ship {
       position: fixed;
@@ -74,30 +70,125 @@
       box-shadow: 0 0 6px #ffee00;
       z-index: 20;
     }
+
+    /* ── Mobile controls ── */
+    #mobile-controls {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 180px;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    /* Left side: D-pad */
+    #dpad {
+      position: absolute;
+      left: 30px;
+      bottom: 30px;
+      width: 130px;
+      height: 130px;
+      pointer-events: none;
+    }
+
+    .dpad-btn {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.2);
+      border: 2px solid rgba(255,255,255,0.5);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: white;
+      pointer-events: all;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    .dpad-btn:active { background: rgba(255,255,255,0.45); }
+
+    #btn-up    { top: 0;   left: 45px; }
+    #btn-down  { bottom: 0; left: 45px; }
+    #btn-left  { top: 45px; left: 0; }
+    #btn-right { top: 45px; right: 0; }
+
+    /* Right side: shoot button */
+    #btn-shoot {
+      position: absolute;
+      right: 35px;
+      bottom: 40px;
+      width: 70px;
+      height: 70px;
+      background: rgba(255, 238, 0, 0.25);
+      border: 2px solid rgba(255, 238, 0, 0.7);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: bold;
+      color: #ffee00;
+      pointer-events: all;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    #btn-shoot:active { background: rgba(255, 238, 0, 0.5); }
+
+    @media (max-width: 768px) {
+      #mobile-controls { display: block; }
+      h1 { font-size: 3.5rem; }
+    }
   </style>
 </head>
 <body>
   <div id="ship"></div>
+
   <div style="text-align: center;">
     <h1>
       <span id="hello" onclick="randomColors()">Hello</span>
       &nbsp;
       <span id="world" onclick="randomColors()">World</span>
     </h1>
-    <p style="font-size: 1.1rem; color: #888; margin-top: -1rem; user-select: none;">
+    <p style="font-size: 1.1rem; color: #888; margin-top: -1rem; user-select: none;" id="hint-text">
       (move the ship, space to shoot, find the blocks)
     </p>
   </div>
 
+  <!-- Mobile controls -->
+  <div id="mobile-controls">
+    <div id="dpad">
+      <div class="dpad-btn" id="btn-up">▲</div>
+      <div class="dpad-btn" id="btn-left">◀</div>
+      <div class="dpad-btn" id="btn-right">▶</div>
+      <div class="dpad-btn" id="btn-down">▼</div>
+    </div>
+    <div id="btn-shoot">SHOOT</div>
+  </div>
+
   <script>
-    const MAX_BALLS = 50;
-    const BASE_SIZE = 50;
-    const STEP = 3;
+    const isMobile = window.matchMedia('(max-width: 768px)').matches || 'ontouchstart' in window;
+
+    const MAX_BALLS   = 50;
+    const BASE_SIZE   = isMobile ? 50 * 0.25 : 50;  // 25% size on mobile
+    const STEP        = isMobile ? 3 * 0.25  : 3;
     const SHRINK_UNTIL = 10;
-    const SQUARE_SIZE = 60;
+    const SQUARE_SIZE = 35;
     const NUM_SQUARES = 17;
-    const balls = [];
+    const balls   = [];
     const squares = [];
+
+    // Update hint text on mobile
+    if (isMobile) {
+      document.getElementById('hint-text').textContent = '(use the controls below, find the blocks)';
+    }
 
     function randomHex() {
       return '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
@@ -116,47 +207,39 @@
       for (let i = 0; i < NUM_SQUARES; i++) {
         const x = SQUARE_SIZE + Math.random() * (window.innerWidth  - SQUARE_SIZE * 3);
         const y = SQUARE_SIZE + Math.random() * (window.innerHeight - SQUARE_SIZE * 3);
-
         const el = document.createElement('div');
         el.className = 'square';
         el.style.left = x + 'px';
         el.style.top  = y + 'px';
         document.body.appendChild(el);
-
         squares.push({ x, y, size: SQUARE_SIZE, el, litTimer: null });
       }
     }
 
-    // AABB collision: returns which axis to reflect, or null
-    function getCollisionAxis(b, s) {
-      const bRight  = b.x + b.size,  bBottom = b.y + b.size;
-      const sRight  = s.x + s.size,  sBottom = s.y + s.size;
-
+    // Returns collision info {axis, overlapX, overlapY} or null
+    function getCollision(b, s) {
+      const bRight  = b.x + b.size, bBottom = b.y + b.size;
+      const sRight  = s.x + s.size, sBottom = s.y + s.size;
       if (bRight < s.x || b.x > sRight || bBottom < s.y || b.y > sBottom) return null;
-
       const overlapLeft   = bRight  - s.x;
       const overlapRight  = sRight  - b.x;
       const overlapTop    = bBottom - s.y;
       const overlapBottom = sBottom - b.y;
-
       const minX = Math.min(overlapLeft, overlapRight);
       const minY = Math.min(overlapTop,  overlapBottom);
-
-      return minX < minY ? 'x' : 'y';
+      return { axis: minX < minY ? 'x' : 'y', minX, minY, overlapLeft, overlapRight, overlapTop, overlapBottom };
     }
 
     function addBall() {
       if (balls.length >= MAX_BALLS) return;
-
       const index = balls.length;
-      const size  = ballSize(index);
+      const size  = Math.max(4, ballSize(index));
       const el    = document.createElement('div');
       el.className = 'ball';
       el.style.width  = size + 'px';
       el.style.height = size + 'px';
       el.style.backgroundColor = randomHex();
       document.body.appendChild(el);
-
       const baseSpeed = 2 + index * 0.8;
       balls.push({
         el, size,
@@ -164,7 +247,7 @@
         y: Math.random() * (window.innerHeight - size),
         vx: (Math.random() < 0.5 ? 1 : -1) * (baseSpeed + Math.random()),
         vy: (Math.random() < 0.5 ? 1 : -1) * (baseSpeed + Math.random() * 0.5),
-        cooldown: {},  // keyed by square index, frames until re-check
+        cooldown: {},
       });
     }
 
@@ -174,49 +257,12 @@
       addBall();
     }
 
-    function animate() {
-      updateShip();
-      updateBullets();
-
-      balls.forEach(b => {
-        b.x += b.vx;
-        b.y += b.vy;
-
-        // Wall bouncing
-        if (b.x + b.size >= window.innerWidth  || b.x <= 0) b.vx *= -1;
-        if (b.y + b.size >= window.innerHeight || b.y <= 0) b.vy *= -1;
-
-        // Square collisions
-        squares.forEach((s, i) => {
-          if (s.destroyed) return;
-          if (b.cooldown[i] > 0) { b.cooldown[i]--; return; }
-
-          const axis = getCollisionAxis(b, s);
-          if (axis) {
-            if (axis === 'x') b.vx *= -1; else b.vy *= -1;
-            b.el.style.backgroundColor = randomHex();
-            b.cooldown[i] = 20;
-
-            // Light up the square for 1 second
-            s.el.classList.add('lit');
-            if (s.litTimer) clearTimeout(s.litTimer);
-            s.litTimer = setTimeout(() => s.el.classList.remove('lit'), 1000);
-          }
-        });
-
-        b.el.style.left = b.x + 'px';
-        b.el.style.top  = b.y + 'px';
-      });
-
-      requestAnimationFrame(animate);
-    }
-
     // ── Spaceship ──────────────────────────────────────────
     const shipEl = document.getElementById('ship');
     const ship = {
       x: window.innerWidth  / 2,
       y: window.innerHeight / 2,
-      angle: 0,       // radians, 0 = pointing up
+      angle: 0,
       vx: 0, vy: 0,
       shootCooldown: 0,
     };
@@ -224,16 +270,32 @@
     const keys = {};
     const bullets = [];
     const BULLET_SPEED = 10;
-    const THRUST = 0.25;
-    const FRICTION = 0.98;
+    const THRUST       = 0.25;
+    const FRICTION     = 0.98;
     const ROTATE_SPEED = 0.065;
 
+    // Keyboard controls
     document.addEventListener('keydown', e => {
       keys[e.key] = true;
       if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))
         e.preventDefault();
     });
     document.addEventListener('keyup', e => keys[e.key] = false);
+
+    // Mobile touch controls
+    function bindBtn(id, key) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true;  }, { passive: false });
+      el.addEventListener('touchend',   e => { e.preventDefault(); keys[key] = false; }, { passive: false });
+      el.addEventListener('touchcancel',e => { e.preventDefault(); keys[key] = false; }, { passive: false });
+    }
+
+    bindBtn('btn-up',    'ArrowUp');
+    bindBtn('btn-down',  'ArrowDown');
+    bindBtn('btn-left',  'ArrowLeft');
+    bindBtn('btn-right', 'ArrowRight');
+    bindBtn('btn-shoot', ' ');
 
     function fireBullet() {
       const el = document.createElement('div');
@@ -265,10 +327,9 @@
       ship.x  += ship.vx;
       ship.y  += ship.vy;
 
-      // Wrap around screen edges
-      if (ship.x < 0)  ship.x = window.innerWidth;
+      if (ship.x < 0) ship.x = window.innerWidth;
       if (ship.x > window.innerWidth)  ship.x = 0;
-      if (ship.y < 0)  ship.y = window.innerHeight;
+      if (ship.y < 0) ship.y = window.innerHeight;
       if (ship.y > window.innerHeight) ship.y = 0;
 
       if (ship.shootCooldown > 0) ship.shootCooldown--;
@@ -288,19 +349,16 @@
         b.x += b.vx;
         b.y += b.vy;
 
-        // Remove bullet if off screen
         if (b.x < 0 || b.x > window.innerWidth || b.y < 0 || b.y > window.innerHeight) {
           b.el.remove();
           bullets.splice(i, 1);
           continue;
         }
 
-        // Check collision with squares
         let hit = false;
         squares.forEach(s => {
           if (hit || s.destroyed) return;
           if (b.x >= s.x && b.x <= s.x + s.size && b.y >= s.y && b.y <= s.y + s.size) {
-            // Destroy the square — turn it red permanently
             s.destroyed = true;
             if (s.litTimer) clearTimeout(s.litTimer);
             s.el.classList.remove('lit');
@@ -319,6 +377,46 @@
         b.el.style.top       = (b.y - 6) + 'px';
         b.el.style.transform = `rotate(${ship.angle}rad)`;
       }
+    }
+
+    function animate() {
+      updateShip();
+      updateBullets();
+
+      balls.forEach(b => {
+        b.x += b.vx;
+        b.y += b.vy;
+
+        if (b.x + b.size >= window.innerWidth  || b.x <= 0) b.vx *= -1;
+        if (b.y + b.size >= window.innerHeight || b.y <= 0) b.vy *= -1;
+
+        squares.forEach((s, i) => {
+          if (s.destroyed) return;
+          if (b.cooldown[i] > 0) { b.cooldown[i]--; return; }
+          const col = getCollision(b, s);
+          if (col) {
+            if (col.axis === 'x') {
+              b.vx *= -1;
+              // Push ball out on x axis
+              b.x += col.overlapLeft < col.overlapRight ? -col.overlapLeft - 1 : col.overlapRight + 1;
+            } else {
+              b.vy *= -1;
+              // Push ball out on y axis
+              b.y += col.overlapTop < col.overlapBottom ? -col.overlapTop - 1 : col.overlapBottom + 1;
+            }
+            b.el.style.backgroundColor = randomHex();
+            b.cooldown[i] = 20;
+            s.el.classList.add('lit');
+            if (s.litTimer) clearTimeout(s.litTimer);
+            s.litTimer = setTimeout(() => s.el.classList.remove('lit'), 1000);
+          }
+        });
+
+        b.el.style.left = b.x + 'px';
+        b.el.style.top  = b.y + 'px';
+      });
+
+      requestAnimationFrame(animate);
     }
 
     createSquares();
